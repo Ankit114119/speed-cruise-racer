@@ -10,7 +10,8 @@ const CarRacingGame = () => {
   const cameraRef = useRef(null);
   const rendererRef = useRef(null);
   const carModelRef = useRef(null);
-  const enemyCarRef = useRef(null);
+  const enemyCar1Ref = useRef(null);
+  const enemyCar2Ref = useRef(null);
   const gameStateRef = useRef({
     isGameOver: false,
     score: 0,
@@ -24,7 +25,8 @@ const CarRacingGame = () => {
     trafficLights: [],
     kerbs: [],
     playerBox: new THREE.Box3(),
-    enemyBox: new THREE.Box3(),
+    enemyBox1: new THREE.Box3(),
+    enemyBox2: new THREE.Box3(),
     pointBox: new THREE.Box3()
   });
   const animationIdRef = useRef(null);
@@ -203,11 +205,11 @@ const CarRacingGame = () => {
       setIsLoading(false);
     };
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Enhanced lighting for better street atmosphere
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); // Reduced ambient light for more dramatic look
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0); // Stronger directional light
     directionalLight.position.set(50, 100, 50);
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.width = 2048;
@@ -219,6 +221,10 @@ const CarRacingGame = () => {
     directionalLight.shadow.camera.top = 50;
     directionalLight.shadow.camera.bottom = -50;
     scene.add(directionalLight);
+
+    // Add additional street lighting atmosphere
+    const streetAmbient = new THREE.AmbientLight(0xffaa55, 0.2); // Warm street light color
+    scene.add(streetAmbient);
 
     // Load HDRI environment
     const hdrPath = 'https://threejs.org/examples/textures/equirectangular/';
@@ -248,25 +254,32 @@ const CarRacingGame = () => {
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // Road
+    // Road - Make it darker and more realistic
     const roadGeo = new THREE.PlaneGeometry(GAME_CONFIG.roadWidth, GAME_CONFIG.roadLength * 1.5);
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.7, metalness: 0.1 });
+    const roadMat = new THREE.MeshStandardMaterial({ 
+      color: 0x1a1a1a, // Much darker road
+      roughness: 0.9, 
+      metalness: 0.0,
+      bumpScale: 0.1
+    });
     const road = new THREE.Mesh(roadGeo, roadMat);
     road.rotation.x = -Math.PI / 2;
     road.position.y = 0.0;
     road.receiveShadow = true;
     scene.add(road);
 
-    // Road lines
+    // Road lines - Make them more visible on dark road
     const lineLength = 4;
     const lineGap = 4;
     const numLines = Math.floor(GAME_CONFIG.roadLength * 1.5 / (lineLength + lineGap));
-    const lineGeo = new THREE.PlaneGeometry(0.3, lineLength);
+    const lineGeo = new THREE.PlaneGeometry(0.4, lineLength); // Slightly wider lines
     const lineMat = new THREE.MeshStandardMaterial({ 
       color: 0xffffff, 
       side: THREE.DoubleSide, 
-      roughness: 0.2, 
-      metalness: 0.0 
+      roughness: 0.1, 
+      metalness: 0.0,
+      emissive: 0x222222, // Slight glow
+      emissiveIntensity: 0.1
     });
     
     for (let i = 0; i < numLines; i++) {
@@ -397,26 +410,47 @@ const CarRacingGame = () => {
       carModelRef.current = carModel;
       scene.add(carModel);
 
-      // Enemy car
-      const enemyCar = gltf.scene.clone();
-      enemyCar.scale.set(0.8, 0.8, 0.8);
-      const initialEnemyX = (Math.random() < 0.5 ? -1 : 1) * GAME_CONFIG.roadWidth / 4;
-      enemyCar.position.set(initialEnemyX, gameStateRef.current.carBaseY, GAME_CONFIG.roadLength * 0.7);
-      enemyCar.rotation.y = 0; // Enemy car faces forward
+      // Enemy cars - Create two cars from the front
+      const enemyCar1 = gltf.scene.clone();
+      enemyCar1.scale.set(0.8, 0.8, 0.8);
+      const leftLaneX = -GAME_CONFIG.roadWidth / 4;
+      enemyCar1.position.set(leftLaneX, gameStateRef.current.carBaseY, GAME_CONFIG.roadLength * 0.8);
+      enemyCar1.rotation.y = 0; // Enemy car faces forward
 
-      enemyCar.traverse((node) => {
+      enemyCar1.traverse((node) => {
         if (node.isMesh) {
           node.castShadow = true;
           node.receiveShadow = true;
-          // Different color for enemy car
+          // Red color for first enemy car
+          if (node.material) {
+            node.material = node.material.clone();
+            node.material.color.setHex(0xcc0000); // Red color
+          }
+        }
+      });
+      enemyCar1Ref.current = enemyCar1;
+      scene.add(enemyCar1);
+
+      // Second enemy car
+      const enemyCar2 = gltf.scene.clone();
+      enemyCar2.scale.set(0.8, 0.8, 0.8);
+      const rightLaneX = GAME_CONFIG.roadWidth / 4;
+      enemyCar2.position.set(rightLaneX, gameStateRef.current.carBaseY, GAME_CONFIG.roadLength * 1.2);
+      enemyCar2.rotation.y = 0; // Enemy car faces forward
+
+      enemyCar2.traverse((node) => {
+        if (node.isMesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+          // Blue color for second enemy car
           if (node.material) {
             node.material = node.material.clone();
             node.material.color.setHex(0x0066cc); // Blue color
           }
         }
       });
-      enemyCarRef.current = enemyCar;
-      scene.add(enemyCar);
+      enemyCar2Ref.current = enemyCar2;
+      scene.add(enemyCar2);
 
       // Set camera position
       camera.position.set(0, gameStateRef.current.carBaseY + 3, -7);
@@ -436,13 +470,22 @@ const CarRacingGame = () => {
       carModelRef.current = carModel;
       scene.add(carModel);
 
-      const enemyCar = new THREE.Mesh(fallbackGeo, new THREE.MeshStandardMaterial({ color: 0x0000ff, roughness: 0.5, metalness: 0.5 }));
-      const initialEnemyX = (Math.random() < 0.5 ? -1 : 1) * GAME_CONFIG.roadWidth / 4;
-      enemyCar.position.set(initialEnemyX, gameStateRef.current.carBaseY, GAME_CONFIG.roadLength * 0.7);
-      enemyCar.castShadow = true;
-      enemyCar.receiveShadow = true;
-      enemyCarRef.current = enemyCar;
-      scene.add(enemyCar);
+      // Fallback enemy cars if GLTF fails
+      const enemyCar1 = new THREE.Mesh(fallbackGeo, new THREE.MeshStandardMaterial({ color: 0xcc0000, roughness: 0.5, metalness: 0.5 }));
+      const leftLaneX = -GAME_CONFIG.roadWidth / 4;
+      enemyCar1.position.set(leftLaneX, gameStateRef.current.carBaseY, GAME_CONFIG.roadLength * 0.8);
+      enemyCar1.castShadow = true;
+      enemyCar1.receiveShadow = true;
+      enemyCar1Ref.current = enemyCar1;
+      scene.add(enemyCar1);
+
+      const enemyCar2 = new THREE.Mesh(fallbackGeo, new THREE.MeshStandardMaterial({ color: 0x0066cc, roughness: 0.5, metalness: 0.5 }));
+      const rightLaneX = GAME_CONFIG.roadWidth / 4;
+      enemyCar2.position.set(rightLaneX, gameStateRef.current.carBaseY, GAME_CONFIG.roadLength * 1.2);
+      enemyCar2.castShadow = true;
+      enemyCar2.receiveShadow = true;
+      enemyCar2Ref.current = enemyCar2;
+      scene.add(enemyCar2);
     });
 
     // Mount renderer
@@ -520,12 +563,20 @@ const CarRacingGame = () => {
       }
     });
 
-    // Move enemy car
-    if (enemyCarRef.current && carModelRef.current) {
-      enemyCarRef.current.position.z -= (GAME_CONFIG.enemyCarSpeed + GAME_CONFIG.driveSpeed);
-      if (enemyCarRef.current.position.z < -sceneryRecycleDistance) {
-        enemyCarRef.current.position.z = GAME_CONFIG.roadLength * 0.7 + Math.random() * GAME_CONFIG.roadLength * 0.5;
-        enemyCarRef.current.position.x = (Math.random() < 0.5 ? -1 : 1) * (GAME_CONFIG.roadWidth / 2 - GAME_CONFIG.kerbWidth - 1);
+    // Move enemy cars
+    if (enemyCar1Ref.current && carModelRef.current) {
+      enemyCar1Ref.current.position.z -= (GAME_CONFIG.enemyCarSpeed + GAME_CONFIG.driveSpeed);
+      if (enemyCar1Ref.current.position.z < -sceneryRecycleDistance) {
+        enemyCar1Ref.current.position.z = GAME_CONFIG.roadLength * 0.8 + Math.random() * GAME_CONFIG.roadLength * 0.5;
+        enemyCar1Ref.current.position.x = -GAME_CONFIG.roadWidth / 4 + (Math.random() - 0.5) * 2;
+      }
+    }
+
+    if (enemyCar2Ref.current && carModelRef.current) {
+      enemyCar2Ref.current.position.z -= (GAME_CONFIG.enemyCarSpeed + GAME_CONFIG.driveSpeed);
+      if (enemyCar2Ref.current.position.z < -sceneryRecycleDistance) {
+        enemyCar2Ref.current.position.z = GAME_CONFIG.roadLength * 1.2 + Math.random() * GAME_CONFIG.roadLength * 0.5;
+        enemyCar2Ref.current.position.x = GAME_CONFIG.roadWidth / 4 + (Math.random() - 0.5) * 2;
       }
     }
 
@@ -572,11 +623,20 @@ const CarRacingGame = () => {
         }
       });
 
-      // Enemy collision
-      if (enemyCarRef.current && enemyCarRef.current.parent) {
-        gameStateRef.current.enemyBox.setFromObject(enemyCarRef.current);
+      // Enemy collision - Check both cars
+      if (enemyCar1Ref.current && enemyCar1Ref.current.parent) {
+        gameStateRef.current.enemyBox1.setFromObject(enemyCar1Ref.current);
         const expandedPlayerBox = gameStateRef.current.playerBox.clone().expandByScalar(0.5);
-        if (expandedPlayerBox.intersectsBox(gameStateRef.current.enemyBox)) {
+        if (expandedPlayerBox.intersectsBox(gameStateRef.current.enemyBox1)) {
+          gameStateRef.current.isGameOver = true;
+          setGameOver(true);
+        }
+      }
+
+      if (enemyCar2Ref.current && enemyCar2Ref.current.parent) {
+        gameStateRef.current.enemyBox2.setFromObject(enemyCar2Ref.current);
+        const expandedPlayerBox = gameStateRef.current.playerBox.clone().expandByScalar(0.5);
+        if (expandedPlayerBox.intersectsBox(gameStateRef.current.enemyBox2)) {
           gameStateRef.current.isGameOver = true;
           setGameOver(true);
         }
@@ -596,9 +656,14 @@ const CarRacingGame = () => {
       carModelRef.current.position.set(0, gameStateRef.current.carBaseY, 0);
     }
 
-    if (enemyCarRef.current) {
-      const initialEnemyX = (Math.random() < 0.5 ? -1 : 1) * GAME_CONFIG.roadWidth / 4;
-      enemyCarRef.current.position.set(initialEnemyX, gameStateRef.current.carBaseY, GAME_CONFIG.roadLength * 0.7);
+    if (enemyCar1Ref.current) {
+      const leftLaneX = -GAME_CONFIG.roadWidth / 4;
+      enemyCar1Ref.current.position.set(leftLaneX, gameStateRef.current.carBaseY, GAME_CONFIG.roadLength * 0.8);
+    }
+
+    if (enemyCar2Ref.current) {
+      const rightLaneX = GAME_CONFIG.roadWidth / 4;
+      enemyCar2Ref.current.position.set(rightLaneX, gameStateRef.current.carBaseY, GAME_CONFIG.roadLength * 1.2);
     }
 
     gameStateRef.current.points.forEach(point => resetPointPosition(point, true));
